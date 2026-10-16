@@ -1,0 +1,8 @@
+{
+  "name": "Soal CSCI H6",
+  "description": "Aplikasi ujian Training Store Crew Special Store H6 (Pre Test \u0026 Post Test)",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
