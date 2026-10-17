@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -9,9 +9,12 @@ import {
   Building2,
   User,
   ShieldAlert,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ExamResult, Question, ExamConfig } from '../types';
+import { getPrefilledGFormUrl } from '../lib/gformService';
 
 interface ResultScreenProps {
   result: ExamResult;
@@ -31,6 +34,27 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
   onBackToLogin,
 }) => {
   const isPassed = result.skor >= config.passingGrade;
+  const [copiedGForm, setCopiedGForm] = useState<boolean>(false);
+  const prefilledGFormUrl = getPrefilledGFormUrl(result);
+
+  const handleCopyGFormUrl = async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(prefilledGFormUrl);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = prefilledGFormUrl;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopiedGForm(true);
+      setTimeout(() => setCopiedGForm(false), 3000);
+    } catch {
+      window.prompt('Salin link Google Form terisi otomatis:', prefilledGFormUrl);
+    }
+  };
 
   useEffect(() => {
     if (isPassed) {
@@ -235,13 +259,37 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
             </div>
           )}
 
+          <button
+            onClick={handleCopyGFormUrl}
+            className={`w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              copiedGForm
+                ? 'bg-emerald-600 text-white shadow-emerald-200'
+                : 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+            }`}
+            title="Salin link Google Form yang telah terisi otomatis seluruh jawaban & identitas peserta"
+          >
+            {copiedGForm ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Link GForm Tersalin! ✓</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Salin Link GForm</span>
+              </>
+            )}
+          </button>
+
           <a
-            href={result.gformUrl || 'https://docs.google.com/forms/d/e/1FAIpQLSfzDkuspFeo7AeQmTmrQbhk3Mpd6mP0Wtg3m119qL8z72QT9A/viewform'}
+            href={prefilledGFormUrl}
             target="_blank"
             rel="noreferrer"
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-1.5"
+            title="Buka langsung formulir Google Form yang sudah terisi lengkap di tab baru"
           >
-            <span>Buka Salinan di GForm</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Buka Salinan di GForm ↗</span>
           </a>
 
           <button
@@ -250,6 +298,11 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
           >
             <span>Selesai & Keluar</span>
           </button>
+        </div>
+
+        <div className="mt-3.5 py-2 px-3 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-center justify-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>Formulir Google Form otomatis terisi identitas lengkap (termasuk Jabatan) serta pilihan jawaban Soal 1 s/d 20.</span>
         </div>
       </div>
     </div>

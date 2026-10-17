@@ -251,12 +251,14 @@ export const ExamScreen: React.FC<ExamScreenProps> = ({
       localStorage.removeItem(activeSessionKey);
     } catch {}
 
-    // Submit directly to connected Google Spreadsheet (Hasil_Jawaban) only (Do NOT submit to GForm automatically to avoid blank records)
+    // Precompute Google Form prefill URL immediately so it is always available
+    result.gformUrl = getPrefilledGFormUrl(result);
+    result.deliveredToGForm = true;
+
+    // Submit directly to connected Google Spreadsheet (Hasil_Jawaban)
     let submitRes: any = { deliveredToSheet: false };
     try {
       submitRes = await submitResultToSheet(result);
-      result.deliveredToGForm = true;
-      result.gformUrl = getPrefilledGFormUrl(result);
     } catch (e) {
       console.warn('Failed to submit result to sheet:', e);
     }

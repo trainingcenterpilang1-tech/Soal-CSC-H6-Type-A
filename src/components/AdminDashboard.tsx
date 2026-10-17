@@ -60,7 +60,7 @@ import {
   verifyAdminPassword,
 } from '../lib/sheetsService';
 import { FIREBASE_PROJECT_ID } from '../lib/firebase';
-import { getCustomGFormUrl, saveCustomGFormUrl, resetCustomGFormUrl } from '../lib/gformService';
+import { getCustomGFormUrl, saveCustomGFormUrl, resetCustomGFormUrl, getPrefilledGFormUrl } from '../lib/gformService';
 
 interface AdminDashboardProps {
   participants: Participant[];
@@ -919,17 +919,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {onDeleteResult && (
                           <td className="py-3 px-3 text-center">
                             {row.examResult ? (
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Hapus hasil pengerjaan ${row.nama} (${row.nik}) dan kembalikan ke status Belum Ujian?`)) {
-                                    onDeleteResult(row.nik);
-                                  }
-                                }}
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                                title="Hapus nilai peserta ini"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <a
+                                  href={getPrefilledGFormUrl(row.examResult)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+                                  title="Buka Google Form terisi otomatis (Jawaban & Profil Peserta)"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Hapus hasil pengerjaan ${row.nama} (${row.nik}) dan kembalikan ke status Belum Ujian?`)) {
+                                      onDeleteResult(row.nik);
+                                    }
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                  title="Hapus nilai peserta ini"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-slate-200">-</span>
                             )}

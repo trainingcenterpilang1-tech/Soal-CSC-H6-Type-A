@@ -1,7 +1,7 @@
 import { ExamResult } from '../types';
 
 export const DEFAULT_GFORM_VIEW_URL =
-  'https://docs.google.com/forms/d/e/1FAIpQLSeictRhQ5MXVG-DhZcMc7hRk8tHUAWsMsrrCpNZbTY4fSxG5g/viewform?';
+  'https://docs.google.com/forms/d/e/1FAIpQLSeictRhQ5MXVG-DhZcMc7hRk8tHUAWsMsrrCpNZbTY4fSxG5g/viewform';
 
 export const DEFAULT_GFORM_RESPONSE_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSeictRhQ5MXVG-DhZcMc7hRk8tHUAWsMsrrCpNZbTY4fSxG5g/formResponse';
@@ -12,7 +12,13 @@ export function getCustomGFormUrl(): string {
   try {
     const saved = localStorage.getItem(GFORM_STORAGE_KEY);
     if (saved && saved.trim().startsWith('http')) {
-      return saved.trim();
+      const clean = saved.trim().replace(/\?.*$/, '').replace(/\/$/, '');
+      // Clear out obsolete legacy form URLs
+      if (clean.includes('1FAIpQLSfzDkuspFeo7AeQmTmrQbhk3Mpd6mP0Wtg3m119qL8z72QT9A')) {
+        localStorage.removeItem(GFORM_STORAGE_KEY);
+        return DEFAULT_GFORM_VIEW_URL;
+      }
+      return clean;
     }
   } catch {}
   return DEFAULT_GFORM_VIEW_URL;
@@ -20,7 +26,7 @@ export function getCustomGFormUrl(): string {
 
 export function getGFormResponseUrl(): string {
   const viewUrl = getCustomGFormUrl();
-  // Convert viewform or viewform?usp=... to formResponse
+  // Convert viewform to formResponse
   if (viewUrl.includes('/viewform')) {
     return viewUrl.replace(/\/viewform.*$/, '/formResponse');
   }
@@ -32,13 +38,14 @@ export function getGFormResponseUrl(): string {
 
 export function saveCustomGFormUrl(url: string): { success: boolean; message: string } {
   try {
-    const clean = url.trim();
+    let clean = url.trim();
     if (!clean || !clean.includes('docs.google.com/forms')) {
       return {
         success: false,
         message: 'Link Google Form tidak valid. Pastikan link diawali dengan https://docs.google.com/forms/...',
       };
     }
+    clean = clean.replace(/\?.*$/, '').replace(/\/$/, '');
     localStorage.setItem(GFORM_STORAGE_KEY, clean);
     return {
       success: true,
@@ -58,7 +65,7 @@ export function resetCustomGFormUrl(): void {
   } catch {}
 }
 
-// Mapping of questions and participant info to Google Form entry IDs
+// Mapping of questions and participant info to Google Form entry IDs (Form: CSCI H6 Modul A)
 export const GFORM_ENTRY_IDS = {
   namaLengkap: 'entry.205349234',
   nik: 'entry.49005209',
@@ -69,43 +76,45 @@ export const GFORM_ENTRY_IDS = {
   tanggalTest: 'entry.2048644142',
   jenisTest: 'entry.578389698',
   questions: {
-    1: 'entry.2075241481',
-    2: 'entry.1079212932',
-    3: 'entry.903750346',
-    4: 'entry.1751990565',
-    5: 'entry.476677321',
-    6: 'entry.1878333472',
-    7: 'entry.1151811125',
-    8: 'entry.2146043607',
-    9: 'entry.1954368537',
-    10: 'entry.2039919471',
-    11: 'entry.432258187',
-    12: 'entry.1762189',
-    13: 'entry.578211796',
-    14: 'entry.837041970',
-    15: 'entry.415099477',
+    1: 'entry.803534099',
+    2: 'entry.1645036718',
+    3: 'entry.1843202799',
+    4: 'entry.390995522',
+    5: 'entry.1283470596',
+    6: 'entry.2075241481',
+    7: 'entry.1079212932',
+    8: 'entry.903750346',
+    9: 'entry.1751990565',
+    10: 'entry.476677321',
+    11: 'entry.1878333472',
+    12: 'entry.1151811125',
+    13: 'entry.2146043607',
+    14: 'entry.1954368537',
+    15: 'entry.2039919471',
+    16: 'entry.449698189',
+    17: 'entry.977996834',
+    18: 'entry.635741623',
+    19: 'entry.1568179574',
+    20: 'entry.187832786',
   } as Record<number, string>,
 };
 
 /**
  * Map raw participant jabatan to Google Form options:
- * ["SCG", "SCB", "MDP OPR", "SDP OPR", "CADANGAN OPR"]
+ * Exactly matches radio choices: "CALON STORE CREW BOY (SCB)" and "CALON STORE CREW GRIL (SCG)"
  */
 export function mapJabatanToGForm(jabatan?: string): string {
   const clean = (jabatan || '').toUpperCase();
-  if (clean.includes('GRIL') || clean.includes('GIRL') || clean === 'SCG') {
-    return 'SCG';
+  if (
+    clean.includes('GRIL') ||
+    clean.includes('GIRL') ||
+    clean.includes('SCG') ||
+    clean.includes('PEREMPUAN') ||
+    clean.includes('WANITA')
+  ) {
+    return 'CALON STORE CREW GRIL (SCG)';
   }
-  if (clean.includes('MDP')) {
-    return 'MDP OPR';
-  }
-  if (clean.includes('SDP')) {
-    return 'SDP OPR';
-  }
-  if (clean.includes('CADANGAN')) {
-    return 'CADANGAN OPR';
-  }
-  return 'SCB';
+  return 'CALON STORE CREW BOY (SCB)';
 }
 
 /**
@@ -121,7 +130,7 @@ export function mapJenisTestToGForm(tipeUjian?: string): string {
 }
 
 /**
- * Builds the URLSearchParams or FormData entries for Google Form submission
+ * Builds the URLSearchParams or FormData entries for Google Form prefill and submission
  */
 export function buildGFormParams(result: ExamResult): URLSearchParams {
   const params = new URLSearchParams();
@@ -148,14 +157,40 @@ export function buildGFormParams(result: ExamResult): URLSearchParams {
   // Jenis Test
   params.append(GFORM_ENTRY_IDS.jenisTest, mapJenisTestToGForm(result.tipeUjian));
 
-  // Answers 1 to 15
-  const ansMap = (result.jawabanPerSoal || {}) as Record<number, string>;
-  for (let q = 1; q <= 15; q++) {
+  // Extract answers map from either jawabanPerSoal or detailJawaban
+  const ansMap: Record<number, string> = {};
+  if (result.jawabanPerSoal && typeof result.jawabanPerSoal === 'object') {
+    Object.entries(result.jawabanPerSoal).forEach(([k, v]) => {
+      const num = parseInt(k, 10);
+      if (!isNaN(num) && v) {
+        ansMap[num] = String(v).trim().toUpperCase();
+      }
+    });
+  }
+  if (Object.keys(ansMap).length === 0 && result.detailJawaban) {
+    let raw = String(result.detailJawaban);
+    const pipeIdx = raw.indexOf('|');
+    if (pipeIdx > -1) raw = raw.substring(pipeIdx + 1);
+    const pairs = raw.split(',');
+    pairs.forEach((pair) => {
+      const parts = pair.trim().split(':');
+      if (parts.length >= 2) {
+        const num = parseInt(parts[0].trim(), 10);
+        const choice = parts[1].trim().toUpperCase();
+        if (!isNaN(num) && choice) {
+          ansMap[num] = choice;
+        }
+      }
+    });
+  }
+
+  // Fill Answers 1 to 20
+  for (let q = 1; q <= 20; q++) {
     const entryKey = GFORM_ENTRY_IDS.questions[q];
     if (entryKey) {
       let rawAns = (ansMap[q] || '').toUpperCase().trim();
       if (!['A', 'B', 'C', 'D'].includes(rawAns)) {
-        rawAns = 'A'; // Google Form requires an option from [A, B, C, D]
+        rawAns = 'A'; // Google Form radio button requires [A, B, C, D]
       }
       params.append(entryKey, rawAns);
     }
@@ -165,12 +200,12 @@ export function buildGFormParams(result: ExamResult): URLSearchParams {
 }
 
 /**
- * Generate a prefilled URL for the Google Form so user/admin can open it in new tab
+ * Generate a prefilled URL for the Google Form so user/admin can open it in new tab or copy link
  */
 export function getPrefilledGFormUrl(result: ExamResult): string {
   const params = buildGFormParams(result);
-  const customView = getCustomGFormUrl();
-  return `${customView}?usp=pp_url&${params.toString()}`;
+  const viewUrl = getCustomGFormUrl();
+  return `${viewUrl}?usp=pp_url&${params.toString()}`;
 }
 
 /**

@@ -313,31 +313,41 @@ const GFORM_ENTRY_IDS = {
   tanggalTest: 'entry.2048644142',
   jenisTest: 'entry.578389698',
   questions: {
-    1: 'entry.2075241481',
-    2: 'entry.1079212932',
-    3: 'entry.903750346',
-    4: 'entry.1751990565',
-    5: 'entry.476677321',
-    6: 'entry.1878333472',
-    7: 'entry.1151811125',
-    8: 'entry.2146043607',
-    9: 'entry.1954368537',
-    10: 'entry.2039919471',
-    11: 'entry.432258187',
-    12: 'entry.1762189',
-    13: 'entry.578211796',
-    14: 'entry.837041970',
-    15: 'entry.415099477',
+    1: 'entry.803534099',
+    2: 'entry.1645036718',
+    3: 'entry.1843202799',
+    4: 'entry.390995522',
+    5: 'entry.1283470596',
+    6: 'entry.2075241481',
+    7: 'entry.1079212932',
+    8: 'entry.903750346',
+    9: 'entry.1751990565',
+    10: 'entry.476677321',
+    11: 'entry.1878333472',
+    12: 'entry.1151811125',
+    13: 'entry.2146043607',
+    14: 'entry.1954368537',
+    15: 'entry.2039919471',
+    16: 'entry.449698189',
+    17: 'entry.977996834',
+    18: 'entry.635741623',
+    19: 'entry.1568179574',
+    20: 'entry.187832786',
   } as Record<number, string>,
 };
 
 function mapJabatanToGForm(jabatan?: string): string {
   const clean = (jabatan || '').toUpperCase();
-  if (clean.includes('GRIL') || clean.includes('GIRL') || clean === 'SCG') return 'SCG';
-  if (clean.includes('MDP')) return 'MDP OPR';
-  if (clean.includes('SDP')) return 'SDP OPR';
-  if (clean.includes('CADANGAN')) return 'CADANGAN OPR';
-  return 'SCB';
+  if (
+    clean.includes('GRIL') ||
+    clean.includes('GIRL') ||
+    clean.includes('SCG') ||
+    clean.includes('PEREMPUAN') ||
+    clean.includes('WANITA')
+  ) {
+    return 'CALON STORE CREW GRIL (SCG)';
+  }
+  return 'CALON STORE CREW BOY (SCB)';
 }
 
 function mapJenisTestToGForm(tipeUjian?: string): string {
@@ -374,11 +384,36 @@ app.post('/api/gform/submit', async (req: Request, res: Response) => {
     params.append(GFORM_ENTRY_IDS.tanggalTest, `${year}-${month}-${day}`);
     params.append(GFORM_ENTRY_IDS.jenisTest, mapJenisTestToGForm(result.tipeUjian));
 
-    const ansMap = result.jawabanPerSoal || {};
-    for (let q = 1; q <= 15; q++) {
+    const ansMap: Record<number, string> = {};
+    if (result.jawabanPerSoal && typeof result.jawabanPerSoal === 'object') {
+      Object.entries(result.jawabanPerSoal).forEach(([k, v]) => {
+        const num = parseInt(k, 10);
+        if (!isNaN(num) && v) {
+          ansMap[num] = String(v).trim().toUpperCase();
+        }
+      });
+    }
+    if (Object.keys(ansMap).length === 0 && result.detailJawaban) {
+      let raw = String(result.detailJawaban);
+      const pipeIdx = raw.indexOf('|');
+      if (pipeIdx > -1) raw = raw.substring(pipeIdx + 1);
+      const pairs = raw.split(',');
+      pairs.forEach((pair) => {
+        const parts = pair.trim().split(':');
+        if (parts.length >= 2) {
+          const num = parseInt(parts[0].trim(), 10);
+          const choice = parts[1].trim().toUpperCase();
+          if (!isNaN(num) && choice) {
+            ansMap[num] = choice;
+          }
+        }
+      });
+    }
+
+    for (let q = 1; q <= 20; q++) {
       const entryKey = GFORM_ENTRY_IDS.questions[q];
       if (entryKey) {
-        let rawAns = (ansMap[q] || ansMap[String(q)] || '').toUpperCase().trim();
+        let rawAns = (ansMap[q] || '').toUpperCase().trim();
         if (!['A', 'B', 'C', 'D'].includes(rawAns)) {
           rawAns = 'A';
         }
