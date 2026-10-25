@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   BookOpen,
@@ -286,6 +286,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
 
+
+  // Exam Parameter Configuration State
+  const [configForm, setConfigForm] = useState<ExamConfig>(config);
+  const [configSavedFeedback, setConfigSavedFeedback] = useState<boolean>(false);
+
+  useEffect(() => {
+    setConfigForm(config);
+  }, [config]);
 
   // Google Form Dynamic Configuration State
   const [gformInput, setGformInput] = useState<string>(getCustomGFormUrl());
@@ -862,6 +870,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               tipeUjian === 'Pre Test'
                                 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                : tipeUjian === 'Remedial 1'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : tipeUjian === 'Remedial 2'
+                                ? 'bg-purple-100 text-purple-800 border border-purple-200'
                                 : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                             }`}>
                               {tipeUjian}
@@ -1738,12 +1750,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Sub Tab 4: Pengaturan Ujian */}
       {activeAdminSubTab === 'pengaturan' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
-          <h3 className="text-base font-bold text-slate-900 mb-1">
-            Konfigurasi Parameter Ujian
-          </h3>
-          <p className="text-xs text-slate-500 mb-6">
-            Atur durasi waktu pengerjaan dan ambang batas kelulusan (KKM)
-          </p>
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">
+                Konfigurasi Parameter Ujian
+              </h3>
+              <p className="text-xs text-slate-500">
+                Atur durasi waktu pengerjaan dan ambang batas kelulusan (KKM) untuk seluruh peserta
+              </p>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                config.isExamOpen ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${config.isExamOpen ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                {config.isExamOpen ? 'Pintu Ujian Terbuka' : 'Ujian Ditutup'}
+              </span>
+            </div>
+          </div>
+
+          {/* Banner Status Pengaturan Aktif Saat Ini */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-5 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="text-left">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Durasi Aktif</div>
+              <div className="text-sm font-extrabold text-blue-600 flex items-center gap-1 mt-0.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>{config.durasiMenit} Menit</span>
+              </div>
+            </div>
+            <div className="text-left">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Standar KKM</div>
+              <div className="text-sm font-extrabold text-amber-600 flex items-center gap-1 mt-0.5">
+                <Award className="w-3.5 h-3.5" />
+                <span>{config.passingGrade} Poin</span>
+              </div>
+            </div>
+            <div className="col-span-2 sm:col-span-1 text-left">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Status Akses</div>
+              <div className={`text-xs font-bold mt-0.5 ${config.isExamOpen ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {config.isExamOpen ? 'Peserta Bisa Ujian' : 'Ditutup Sementara'}
+              </div>
+            </div>
+          </div>
+
+          {configSavedFeedback && (
+            <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Pengaturan ujian (durasi & standar KKM) berhasil disimpan dan disinkronkan ke seluruh peserta!</span>
+            </div>
+          )}
 
           <div className="space-y-5">
             <div>
@@ -1752,9 +1807,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </label>
               <input
                 type="text"
-                value={config.judulUjian || 'Training Evabul SC'}
-                onChange={(e) => onUpdateConfig({ ...config, judulUjian: e.target.value })}
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={configForm.judulUjian || 'Training CSCI'}
+                onChange={(e) => setConfigForm((prev) => ({ ...prev, judulUjian: e.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -1766,50 +1821,72 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="relative">
                   <input
                     type="number"
-                    min="5"
-                    max="120"
-                    value={config.durasiMenit}
+                    min="1"
+                    max="180"
+                    value={configForm.durasiMenit}
                     onChange={(e) =>
-                      onUpdateConfig({ ...config, durasiMenit: Number(e.target.value) || 20 })
+                      setConfigForm((prev) => ({ ...prev, durasiMenit: Number(e.target.value) || 20 }))
                     }
-                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                  <Clock className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">Waktu hitung mundur otomatis untuk peserta.</p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Standar Kelulusan / KKM (Skor)
+                  Standar Kelulusan / KKM (Skor 0-100)
                 </label>
                 <div className="relative">
                   <input
                     type="number"
                     min="10"
                     max="100"
-                    value={config.passingGrade}
+                    value={configForm.passingGrade}
                     onChange={(e) =>
-                      onUpdateConfig({ ...config, passingGrade: Number(e.target.value) || 75 })
+                      setConfigForm((prev) => ({ ...prev, passingGrade: Number(e.target.value) || 60 }))
                     }
-                    className="w-full pl-3.5 pr-10 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <Award className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
+                  <Award className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
                 </div>
+                <p className="text-[11px] text-slate-500 mt-1">Nilai minimal untuk status LULUS.</p>
               </div>
             </div>
 
             <div className="pt-2">
-              <label className="flex items-center gap-2.5 cursor-pointer">
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors">
                 <input
                   type="checkbox"
-                  checked={config.isExamOpen}
-                  onChange={(e) => onUpdateConfig({ ...config, isExamOpen: e.target.checked })}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                  checked={configForm.isExamOpen}
+                  onChange={(e) => setConfigForm((prev) => ({ ...prev, isExamOpen: e.target.checked }))}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
-                <span className="text-xs font-semibold text-slate-800">
-                  Buka Pintu Ujian (Peserta dapat langsung mulai mengerjakan)
-                </span>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    Buka Pintu Ujian (Peserta dapat langsung mulai mengerjakan)
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Jika tidak dicentang, peserta belum dapat menekan tombol Mulai Ujian.
+                  </span>
+                </div>
               </label>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateConfig(configForm);
+                  setConfigSavedFeedback(true);
+                  setTimeout(() => setConfigSavedFeedback(false), 4000);
+                }}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>Simpan & Terapkan Pengaturan ke Seluruh Peserta</span>
+              </button>
             </div>
           </div>
         </div>

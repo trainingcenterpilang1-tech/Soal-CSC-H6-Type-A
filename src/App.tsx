@@ -35,6 +35,8 @@ import {
   deleteSingleResultFromSheet,
   getRunningDatePasswords,
   syncServerSpreadsheetConfig,
+  fetchServerExamConfig,
+  saveServerExamConfig,
   SYNC_EVENT_NAME,
 } from './lib/sheetsService';
 import { AlertCircle, CheckCircle2, FileSpreadsheet, Lock, Smartphone } from 'lucide-react';
@@ -83,12 +85,18 @@ export default function App() {
   const syncDataFromSheets = useCallback(async (silent: boolean = false) => {
     setSyncStatus((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
-      const [fetchedPeserta, fetchedLogin, fetchedQuestions, fetchedResults] = await Promise.all([
+      const [fetchedPeserta, fetchedLogin, fetchedQuestions, fetchedResults, serverConfig] = await Promise.all([
         fetchDataPesertaFromSheet(),
         fetchDataLoginFromSheet(),
         fetchQuestionsFromSheet(),
         fetchResultsFromSheet(),
+        fetchServerExamConfig(),
       ]);
+
+      if (serverConfig) {
+        setConfig(serverConfig);
+        saveCachedConfig(serverConfig);
+      }
 
       // Synchronize both dataPeserta and dataLogin from Supabase Data_Peserta
       const activePesertaList = fetchedLogin.length > 0 ? fetchedLogin : fetchedPeserta;
@@ -203,7 +211,11 @@ export default function App() {
 
     // 5. Cross-tab storage event
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'stm_last_sync_timestamp' || e.key === 'stm_results_cache') {
+      if (
+        e.key === 'stm_last_sync_timestamp' ||
+        e.key === 'stm_results_cache' ||
+        e.key === 'stm_config_cache'
+      ) {
         syncDataFromSheets(true);
       }
     };
@@ -482,10 +494,11 @@ export default function App() {
                 questions={questions}
                 results={results}
                 config={config}
-                onUpdateConfig={(newConfig) => {
+                onUpdateConfig={async (newConfig) => {
                   setConfig(newConfig);
                   saveCachedConfig(newConfig);
-                  showToast('Konfigurasi ujian berhasil disimpan!', 'success');
+                  await saveServerExamConfig(newConfig);
+                  showToast('Pengaturan ujian (durasi & KKM) berhasil disimpan & disinkronkan ke seluruh peserta!', 'success');
                 }}
                 onUpdateQuestions={(newQuestions) => {
                   setQuestions(newQuestions);

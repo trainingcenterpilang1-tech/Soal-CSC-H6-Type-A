@@ -224,6 +224,10 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({
               <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
                 result.tipeUjian === 'Pre Test'
                   ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                  : result.tipeUjian === 'Remedial 1'
+                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                  : result.tipeUjian === 'Remedial 2'
+                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
                   : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
               }`}>
                 {result.tipeUjian}

@@ -861,6 +861,55 @@ export const saveCachedConfig = (config: ExamConfig) => {
   }
 };
 
+export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
+  try {
+    const res = await fetch('/api/exam/config', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        saveCachedConfig(data.config);
+        return data.config;
+      }
+    }
+  } catch {
+    // offline or startup
+  }
+  return null;
+};
+
+export const saveServerExamConfig = async (newConfig: ExamConfig): Promise<boolean> => {
+  saveCachedConfig(newConfig);
+  try {
+    const res = await fetch('/api/exam/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newConfig),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.config) {
+        saveCachedConfig(data.config);
+      }
+    }
+    triggerAppSync();
+    return true;
+  } catch (e) {
+    console.warn('Error saving exam config to server:', e);
+    triggerAppSync();
+    return false;
+  }
+};
+
+export const parseTipeUjian = (raw?: any): 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2' | undefined => {
+  if (!raw) return undefined;
+  const clean = String(raw).trim().toUpperCase();
+  if (clean.includes('REMEDIAL 1') || clean.includes('REM 1')) return 'Remedial 1';
+  if (clean.includes('REMEDIAL 2') || clean.includes('REM 2')) return 'Remedial 2';
+  if (clean.includes('PRE')) return 'Pre Test';
+  if (clean.includes('POST')) return 'Post Test';
+  return undefined;
+};
+
 export const SYNC_EVENT_NAME = 'stm_realtime_sync_event';
 
 export const triggerAppSync = () => {
@@ -1317,7 +1366,7 @@ export async function fetchResultsFromSheet(): Promise<ExamResult[]> {
         let kodeToko = '';
         let namaToko = '';
         let jabatanVal = 'SCB';
-        let tipeUjian: 'Pre Test' | 'Post Test' | undefined = undefined;
+        let tipeUjian: 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2' | undefined = undefined;
         let skor = 0;
         let totalSoal = 15;
         let jumlahBenar = 0;
@@ -1337,7 +1386,7 @@ export async function fetchResultsFromSheet(): Promise<ExamResult[]> {
           kodeToko = c[3]?.v !== undefined && c[3]?.v !== null ? String(c[3].v).trim() : '';
           namaToko = c[4]?.v !== undefined && c[4]?.v !== null ? String(c[4].v).trim() : '';
           jabatanVal = col5 || 'SCB';
-          tipeUjian = col6.includes('Pre') ? 'Pre Test' : (col6.includes('Post') ? 'Post Test' : undefined);
+          tipeUjian = parseTipeUjian(col6);
           skor = c[7]?.v !== undefined ? Number(c[7].v) || 0 : 0;
           totalSoal = c[8]?.v !== undefined ? Number(c[8].v) || 15 : 15;
           jumlahBenar = c[9]?.v !== undefined ? Number(c[9].v) || 0 : 0;
@@ -1352,7 +1401,7 @@ export async function fetchResultsFromSheet(): Promise<ExamResult[]> {
           kodeToko = c[3]?.v !== undefined && c[3]?.v !== null ? String(c[3].v).trim() : '';
           namaToko = c[4]?.v !== undefined && c[4]?.v !== null ? String(c[4].v).trim() : '';
           const col7 = String(c[7]?.v || '').trim();
-          tipeUjian = col7.includes('Pre') ? 'Pre Test' : (col7.includes('Post') ? 'Post Test' : undefined);
+          tipeUjian = parseTipeUjian(col7);
           skor = c[8]?.v !== undefined ? Number(c[8].v) || 0 : 0;
           totalSoal = c[9]?.v !== undefined ? Number(c[9].v) || 15 : 15;
           jumlahBenar = c[10]?.v !== undefined ? Number(c[10].v) || 0 : 0;
@@ -1479,9 +1528,7 @@ export async function fetchResultsFromSheet(): Promise<ExamResult[]> {
           const namaToko = String(row[namaTokoIdx !== -1 ? namaTokoIdx : 4] || '').trim();
           const jabatanVal = jabatanIdx !== -1 && row[jabatanIdx] ? String(row[jabatanIdx]).trim() : String(row[5] || 'SCB').trim();
           const tipeUjianRaw = jenisIdx !== -1 && row[jenisIdx] ? String(row[jenisIdx]).trim() : '';
-          const tipeUjian: 'Pre Test' | 'Post Test' | undefined = tipeUjianRaw.includes('Pre')
-            ? 'Pre Test'
-            : (tipeUjianRaw.includes('Post') ? 'Post Test' : undefined);
+          const tipeUjian = parseTipeUjian(tipeUjianRaw);
 
           const skor = Number(row[skorIdx !== -1 ? skorIdx : 7]) || 0;
           const durasiFormatted = String(row[durasiFmtIdx !== -1 ? durasiFmtIdx : 13] || '00:00').trim();

@@ -412,6 +412,10 @@ export const ExamScreen: React.FC<ExamScreenProps> = ({
                 <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
                   participant.tipeUjian === 'Pre Test'
                     ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                    : participant.tipeUjian === 'Remedial 1'
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : participant.tipeUjian === 'Remedial 2'
+                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
                     : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                 }`}>
                   {participant.tipeUjian}

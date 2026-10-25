@@ -15,11 +15,30 @@ const RESULTS_BACKUP_FILE = path.resolve('/tmp', 'cbt_exam_results_backup.json')
 
 const CONFIG_FILE = path.resolve('/tmp', 'cbt_server_config.json');
 
+export interface ExamConfigData {
+  durasiMenit: number;
+  passingGrade: number;
+  acakSoal: boolean;
+  judulUjian: string;
+  lokasiCabang: string;
+  isExamOpen: boolean;
+}
+
+const DEFAULT_EXAM_CONFIG_DATA: ExamConfigData = {
+  durasiMenit: 25,
+  passingGrade: 60,
+  acakSoal: false,
+  judulUjian: 'Training CSCI',
+  lokasiCabang: 'Indomaret Cabang Surabaya',
+  isExamOpen: true,
+};
+
 interface ServerConfig {
   appsScriptUrl: string;
   spreadsheetId: string;
   spreadsheetUrl: string;
   googleAuthToken?: string;
+  examConfig?: ExamConfigData;
 }
 
 const DEFAULT_SPREADSHEET_ID = '14VuRQes6D3uQuMFkmf9kpruoUKuSGq1T9kAMtN9F7qc';
@@ -31,13 +50,13 @@ function readServerConfig(): ServerConfig {
     if (fs.existsSync(CONFIG_FILE)) {
       const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      const isOldId = parsed.spreadsheetId === '14VuRQes6D3uQuMFkmf9kpruoUKuSGq1T9kAMtN9F7qc';
-      const isOldScript = parsed.appsScriptUrl?.includes('AKfycbx9-Oz1aIflQQ3JyHA93Kwprdpym5i7v2w5h4Ik2urNCoYPXo8Y8Lzwy9ws5OV4bNMI');
+      const isOldScript = parsed.appsScriptUrl?.includes('AKfycbY06qqZDQZveqy2g095bUCAQsmieMuloWMp6GtmPs5qfAF_caeL3ELaZVbpXzucBFncw');
       return {
         appsScriptUrl: (isOldScript || !parsed.appsScriptUrl) ? DEFAULT_APPS_SCRIPT_URL : parsed.appsScriptUrl,
-        spreadsheetId: (isOldId || !parsed.spreadsheetId) ? DEFAULT_SPREADSHEET_ID : parsed.spreadsheetId,
-        spreadsheetUrl: (isOldId || !parsed.spreadsheetUrl) ? DEFAULT_SPREADSHEET_URL : parsed.spreadsheetUrl,
+        spreadsheetId: parsed.spreadsheetId || DEFAULT_SPREADSHEET_ID,
+        spreadsheetUrl: parsed.spreadsheetUrl || DEFAULT_SPREADSHEET_URL,
         googleAuthToken: parsed.googleAuthToken || undefined,
+        examConfig: parsed.examConfig || DEFAULT_EXAM_CONFIG_DATA,
       };
     }
   } catch (e) {
@@ -47,6 +66,7 @@ function readServerConfig(): ServerConfig {
     appsScriptUrl: DEFAULT_APPS_SCRIPT_URL,
     spreadsheetId: DEFAULT_SPREADSHEET_ID,
     spreadsheetUrl: DEFAULT_SPREADSHEET_URL,
+    examConfig: DEFAULT_EXAM_CONFIG_DATA,
   };
 }
 
@@ -189,6 +209,41 @@ app.post('/api/sheets/config', (req: Request, res: Response) => {
       spreadsheetId: serverConfig.spreadsheetId,
       spreadsheetUrl: serverConfig.spreadsheetUrl,
     },
+  });
+});
+
+// API: Get Exam Config (Used by all participant devices & admin)
+app.get('/api/exam/config', (req: Request, res: Response) => {
+  return res.json({
+    success: true,
+    config: serverConfig.examConfig || DEFAULT_EXAM_CONFIG_DATA,
+  });
+});
+
+// API: Update Exam Config (Saved by Admin, instantly synced to all participants)
+app.post('/api/exam/config', (req: Request, res: Response) => {
+  const incoming = req.body;
+  if (!incoming || typeof incoming !== 'object') {
+    return res.status(400).json({ success: false, message: 'Data konfigurasi tidak valid.' });
+  }
+
+  const current = serverConfig.examConfig || DEFAULT_EXAM_CONFIG_DATA;
+  const updated: ExamConfigData = {
+    durasiMenit: typeof incoming.durasiMenit === 'number' && incoming.durasiMenit > 0 ? incoming.durasiMenit : current.durasiMenit,
+    passingGrade: typeof incoming.passingGrade === 'number' && incoming.passingGrade > 0 ? incoming.passingGrade : current.passingGrade,
+    acakSoal: typeof incoming.acakSoal === 'boolean' ? incoming.acakSoal : current.acakSoal,
+    judulUjian: typeof incoming.judulUjian === 'string' && incoming.judulUjian.trim() ? incoming.judulUjian.trim() : current.judulUjian,
+    lokasiCabang: typeof incoming.lokasiCabang === 'string' && incoming.lokasiCabang.trim() ? incoming.lokasiCabang.trim() : current.lokasiCabang,
+    isExamOpen: typeof incoming.isExamOpen === 'boolean' ? incoming.isExamOpen : current.isExamOpen,
+  };
+
+  saveServerConfig({ examConfig: updated });
+  console.log('[Server] Exam config updated by admin:', updated);
+
+  return res.json({
+    success: true,
+    message: 'Konfigurasi parameter ujian berhasil diperbarui di server!',
+    config: updated,
   });
 });
 

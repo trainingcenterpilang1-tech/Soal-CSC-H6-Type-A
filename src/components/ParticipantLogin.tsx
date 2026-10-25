@@ -15,6 +15,8 @@ import {
   MapPin,
   ShieldAlert,
   ShieldCheck,
+  RotateCcw,
+  Award,
 } from 'lucide-react';
 import { Participant, ExamConfig, ExamResult } from '../types';
 import { getRunningDatePasswords, verifyDailyDatePassword } from '../lib/sheetsService';
@@ -35,6 +37,7 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
   dataLogin = [],
   onLoginSuccess,
   examConfig,
+  totalQuestions = 30,
   existingResults,
   onViewResult,
   onOpenAdminLogin,
@@ -102,7 +105,7 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
     }
   };
 
-  const handleStartExam = (type: 'Pre Test' | 'Post Test') => {
+  const handleStartExam = (type: 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2') => {
     if (!authenticatedUser) return;
 
     if (!selectedJabatan) {
@@ -149,9 +152,15 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
             Selamat datang di sistem kompetensi Training CSCI. Silakan login menggunakan NIP dan Password ( yang diinfokan sama trainer pengajar )
           </p>
 
-          <div className="inline-flex items-center gap-1.5 bg-blue-950/60 px-3 py-1.5 rounded-lg border border-blue-600/40 text-xs font-semibold text-amber-300">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span>Durasi: <strong>{examConfig.durasiMenit} Menit</strong></span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 bg-blue-950/60 px-3 py-1.5 rounded-lg border border-blue-600/40 text-xs font-semibold text-amber-300">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>Durasi: <strong>{examConfig.durasiMenit} Menit</strong></span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 bg-blue-950/60 px-3 py-1.5 rounded-lg border border-blue-600/40 text-xs font-semibold text-emerald-300">
+              <Award className="w-4 h-4 text-emerald-400" />
+              <span>Standar KKM: <strong>{examConfig.passingGrade} Poin</strong></span>
+            </div>
           </div>
         </div>
       </div>
@@ -431,17 +440,48 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
               </button>
             </div>
           ) : (
-            /* 2 Tombol Pilihan: Pre Test dan Post Test */
+            /* 4 Tombol Pilihan: Pre Test, Post Test, Remedial 1, dan Remedial 2 */
             <div className="space-y-3 pt-1">
-              <span className="block text-xs font-bold text-slate-700 text-center">
-                Pilih Jenis Ujian untuk Mulai Mengerjakan:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* Parameter Sesi Ujian Aktif (Live dari Admin) */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1.5">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-blue-600" />
+                    Durasi Pengerjaan:
+                  </span>
+                  <span className="font-bold text-slate-900">{examConfig.durasiMenit} Menit</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium flex items-center gap-1.5">
+                    <Award className="w-3.5 h-3.5 text-amber-600" />
+                    Standar Kelulusan (KKM):
+                  </span>
+                  <span className="font-bold text-slate-900">{examConfig.passingGrade} Poin</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="font-medium flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                    Jumlah Soal:
+                  </span>
+                  <span className="font-bold text-slate-900">{totalQuestions} Butir</span>
+                </div>
+              </div>
+
+              {!examConfig.isExamOpen ? (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs text-center font-bold">
+                  Pintu ujian saat ini sedang ditutup oleh Admin/Trainer. Harap tunggu instruksi lebih lanjut untuk mulai mengerjakan.
+                </div>
+              ) : (
+                <>
+                  <span className="block text-xs font-bold text-slate-700 text-center">
+                    Pilih Jenis Ujian untuk Mulai Mengerjakan:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   id="btn-pre-test"
                   type="button"
                   onClick={() => handleStartExam('Pre Test')}
-                  className="w-full py-3.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-3 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <BookOpen className="w-4 h-4 text-indigo-200" />
                   <span>Mulai Pre Test</span>
@@ -451,14 +491,36 @@ export const ParticipantLogin: React.FC<ParticipantLoginProps> = ({
                   id="btn-post-test"
                   type="button"
                   onClick={() => handleStartExam('Post Test')}
-                  className="w-full py-3.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4 text-amber-300" />
                   <span>Mulai Post Test</span>
                 </button>
-              </div>
 
-              <button
+                <button
+                  id="btn-remedial-1"
+                  type="button"
+                  onClick={() => handleStartExam('Remedial 1')}
+                  className="w-full py-3 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-200" />
+                  <span>Mulai Remedial 1</span>
+                </button>
+
+                <button
+                  id="btn-remedial-2"
+                  type="button"
+                  onClick={() => handleStartExam('Remedial 2')}
+                  className="w-full py-3 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Award className="w-4 h-4 text-purple-200" />
+                  <span>Mulai Remedial 2</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          <button
                 type="button"
                 onClick={() => {
                   setAuthenticatedUser(null);
