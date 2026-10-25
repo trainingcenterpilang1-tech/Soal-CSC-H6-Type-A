@@ -862,6 +862,47 @@ export const saveCachedConfig = (config: ExamConfig) => {
 };
 
 export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
+  // 1. Fetch from Supabase Cloud Database (ensures all devices & Vercel participants get the exact same admin settings)
+  try {
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}?nip=eq.__CONFIG_EXAM__&select=nama`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Accept': 'application/json',
+        },
+        cache: 'no-store',
+      }
+    );
+    if (response.ok) {
+      const rows = await response.json();
+      if (Array.isArray(rows) && rows.length > 0 && rows[0]?.nama) {
+        try {
+          const parsed = JSON.parse(rows[0].nama);
+          if (parsed && typeof parsed === 'object') {
+            const mergedConfig: ExamConfig = {
+              ...DEFAULT_EXAM_CONFIG,
+              ...parsed,
+              durasiMenit: Number(parsed.durasiMenit) || DEFAULT_EXAM_CONFIG.durasiMenit,
+              passingGrade: Number(parsed.passingGrade) || DEFAULT_EXAM_CONFIG.passingGrade,
+              judulUjian: parsed.judulUjian || DEFAULT_EXAM_CONFIG.judulUjian,
+              isExamOpen: parsed.isExamOpen !== undefined ? Boolean(parsed.isExamOpen) : DEFAULT_EXAM_CONFIG.isExamOpen,
+            };
+            saveCachedConfig(mergedConfig);
+            return mergedConfig;
+          }
+        } catch (jsonErr) {
+          console.warn('Failed to parse Supabase config JSON:', jsonErr);
+        }
+      }
+    }
+  } catch (cloudErr) {
+    console.warn('Supabase config fetch failed, checking local server...', cloudErr);
+  }
+
+  // 2. Fetch from Express backend /api/exam/config
   try {
     const res = await fetch('/api/exam/config', { cache: 'no-store' });
     if (res.ok) {
@@ -874,11 +915,66 @@ export const fetchServerExamConfig = async (): Promise<ExamConfig | null> => {
   } catch {
     // offline or startup
   }
-  return null;
+
+  return getCachedConfig();
 };
 
 export const saveServerExamConfig = async (newConfig: ExamConfig): Promise<boolean> => {
+  // 1. Update local cache immediately
   saveCachedConfig(newConfig);
+
+  // 2. Persist to Supabase Cloud Database (so participant on separate phone/browser instantly gets the updated duration & KKM)
+  let cloudSuccess = false;
+  try {
+    const patchRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}?nip=eq.__CONFIG_EXAM__`,
+      {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({
+          nama: JSON.stringify(newConfig),
+          jenis_training: 'CONFIG',
+          departemen: 'SYSTEM',
+        }),
+      }
+    );
+    if (patchRes.ok) {
+      const patched = await patchRes.json();
+      if (Array.isArray(patched) && patched.length > 0) {
+        cloudSuccess = true;
+      } else {
+        // If row does not exist yet, insert new row
+        const insRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE_DATA_PESERTA}`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation',
+            },
+            body: JSON.stringify({
+              nip: '__CONFIG_EXAM__',
+              nama: JSON.stringify(newConfig),
+              jenis_training: 'CONFIG',
+              departemen: 'SYSTEM',
+            }),
+          }
+        );
+        cloudSuccess = insRes.ok;
+      }
+    }
+  } catch (cloudErr) {
+    console.warn('Error saving exam config to Supabase cloud:', cloudErr);
+  }
+
+  // 3. Persist to local server /api/exam/config
   try {
     const res = await fetch('/api/exam/config', {
       method: 'POST',
@@ -891,13 +987,13 @@ export const saveServerExamConfig = async (newConfig: ExamConfig): Promise<boole
         saveCachedConfig(data.config);
       }
     }
-    triggerAppSync();
-    return true;
   } catch (e) {
     console.warn('Error saving exam config to server:', e);
-    triggerAppSync();
-    return false;
   }
+
+  // 4. Broadcast to other tabs & windows
+  triggerAppSync(newConfig);
+  return cloudSuccess;
 };
 
 export const parseTipeUjian = (raw?: any): 'Pre Test' | 'Post Test' | 'Remedial 1' | 'Remedial 2' | undefined => {
@@ -912,13 +1008,13 @@ export const parseTipeUjian = (raw?: any): 'Pre Test' | 'Post Test' | 'Remedial 
 
 export const SYNC_EVENT_NAME = 'stm_realtime_sync_event';
 
-export const triggerAppSync = () => {
+export const triggerAppSync = (newConfig?: ExamConfig) => {
   try {
     localStorage.setItem('stm_last_sync_timestamp', String(Date.now()));
-    window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME));
+    window.dispatchEvent(new CustomEvent(SYNC_EVENT_NAME, { detail: newConfig }));
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel('stm_sync_channel');
-      bc.postMessage({ type: 'SYNC', timestamp: Date.now() });
+      bc.postMessage({ type: 'SYNC', timestamp: Date.now(), config: newConfig });
       bc.close();
     }
   } catch {
@@ -1079,8 +1175,13 @@ export async function fetchDataLoginFromSheet(): Promise<Participant[]> {
               if (!r) return false;
               const cleanNip = String(r.nip || r.nik || '').trim();
               const cleanNama = String(r.nama || '').trim();
-              if (!cleanNip || !cleanNama) return false;
-              if (cleanNip.startsWith('__') || cleanNip.toLowerCase() === 'nip' || cleanNip.toLowerCase() === 'nik') return false;
+              if (
+                cleanNip.startsWith('__') ||
+                cleanNip.includes('CONFIG') ||
+                cleanNama.includes('durasiMenit') ||
+                cleanNip.toLowerCase() === 'nip' ||
+                cleanNip.toLowerCase() === 'nik'
+              ) return false;
               return true;
             })
             .map((r: any) => ({
@@ -1117,8 +1218,13 @@ export async function fetchDataLoginFromSheet(): Promise<Participant[]> {
               if (!r) return false;
               const cleanNip = String(r.nip || r.nik || '').trim();
               const cleanNama = String(r.nama || '').trim();
-              if (!cleanNip || !cleanNama) return false;
-              if (cleanNip.startsWith('__') || cleanNip.toLowerCase() === 'nip' || cleanNip.toLowerCase() === 'nik') return false;
+              if (
+                cleanNip.startsWith('__') ||
+                cleanNip.includes('CONFIG') ||
+                cleanNama.includes('durasiMenit') ||
+                cleanNip.toLowerCase() === 'nip' ||
+                cleanNip.toLowerCase() === 'nik'
+              ) return false;
               return true;
             })
             .map((r: any) => ({

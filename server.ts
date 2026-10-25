@@ -25,8 +25,8 @@ export interface ExamConfigData {
 }
 
 const DEFAULT_EXAM_CONFIG_DATA: ExamConfigData = {
-  durasiMenit: 25,
-  passingGrade: 60,
+  durasiMenit: 20,
+  passingGrade: 70,
   acakSoal: false,
   judulUjian: 'Training CSCI',
   lokasiCabang: 'Indomaret Cabang Surabaya',

@@ -171,6 +171,14 @@ export default function App() {
 
   // Fetch live sheets data immediately on mount and setup auto-sync
   useEffect(() => {
+    // 0. Fetch latest exam parameters (durasi & KKM) immediately so participant sees updated values instantly
+    fetchServerExamConfig().then((cfg) => {
+      if (cfg) {
+        setConfig(cfg);
+        saveCachedConfig(cfg);
+      }
+    });
+
     syncServerSpreadsheetConfig();
     syncDataFromSheets(true);
 
@@ -180,9 +188,17 @@ export default function App() {
     }, 8000);
 
     // 2. Trigger sync on window focus & tab visibility change
-    const handleFocus = () => syncDataFromSheets(true);
+    const handleFocus = () => {
+      fetchServerExamConfig().then((cfg) => {
+        if (cfg) setConfig(cfg);
+      });
+      syncDataFromSheets(true);
+    };
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        fetchServerExamConfig().then((cfg) => {
+          if (cfg) setConfig(cfg);
+        });
         syncDataFromSheets(true);
       }
     };
@@ -191,7 +207,10 @@ export default function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 3. Custom real-time sync event across window / tabs
-    const handleSyncEvent = () => {
+    const handleSyncEvent = (e: any) => {
+      if (e?.detail) {
+        setConfig(e.detail);
+      }
       syncDataFromSheets(true);
     };
     window.addEventListener(SYNC_EVENT_NAME, handleSyncEvent);
@@ -201,7 +220,10 @@ export default function App() {
     if (typeof BroadcastChannel !== 'undefined') {
       try {
         bc = new BroadcastChannel('stm_sync_channel');
-        bc.onmessage = () => {
+        bc.onmessage = (ev) => {
+          if (ev?.data?.config) {
+            setConfig(ev.data.config);
+          }
           syncDataFromSheets(true);
         };
       } catch {
@@ -214,8 +236,11 @@ export default function App() {
       if (
         e.key === 'stm_last_sync_timestamp' ||
         e.key === 'stm_results_cache' ||
+        e.key === 'stm_exam_config' ||
         e.key === 'stm_config_cache'
       ) {
+        const latestConfig = getCachedConfig();
+        setConfig(latestConfig);
         syncDataFromSheets(true);
       }
     };

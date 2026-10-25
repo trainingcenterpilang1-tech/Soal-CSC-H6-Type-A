@@ -10,8 +10,8 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 export const SUPABASE_TABLE_DATA_PESERTA = 'Data_Peserta';
 
 export const DEFAULT_EXAM_CONFIG: ExamConfig = {
-  durasiMenit: 25,
-  passingGrade: 60,
+  durasiMenit: 20,
+  passingGrade: 70,
   acakSoal: false,
   judulUjian: 'Training CSCI',
   lokasiCabang: 'Indomaret Cabang Surabaya',
